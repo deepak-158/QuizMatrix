@@ -75,11 +75,25 @@ const LiveQuestion = () => {
 
         try {
             const currentQuestion = questions[quiz.currentQuestionIndex];
+            if (!currentQuestion) {
+                throw new Error('Question not found');
+            }
+
             const isCorrect = selectedAnswer === currentQuestion.correctAnswer;
 
-            // Calculate time taken
-            const startTime = answerStartTime?.toDate?.() || new Date(answerStartTime);
-            const timeTaken = (Date.now() - startTime.getTime()) / 1000;
+            // Calculate time taken - handle both Firestore Timestamp and Date
+            let startTime;
+            if (answerStartTime?.toDate) {
+                startTime = answerStartTime.toDate();
+            } else if (answerStartTime?.seconds) {
+                startTime = new Date(answerStartTime.seconds * 1000);
+            } else if (answerStartTime) {
+                startTime = new Date(answerStartTime);
+            } else {
+                startTime = new Date();
+            }
+
+            const timeTaken = Math.max(0, (Date.now() - startTime.getTime()) / 1000);
 
             const points = await submitAnswer(
                 quizId,
@@ -96,7 +110,7 @@ const LiveQuestion = () => {
             setLastPoints(points);
         } catch (error) {
             console.error('Error submitting answer:', error);
-            alert('Failed to submit answer. Please try again.');
+            alert('Failed to submit answer: ' + error.message);
         }
 
         setSubmitting(false);

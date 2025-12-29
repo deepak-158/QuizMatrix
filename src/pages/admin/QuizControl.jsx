@@ -14,7 +14,7 @@ const QuizControl = () => {
     const { quiz, loading: quizLoading } = useQuizSubscription(quizId);
     const { questions } = useQuestionsSubscription(quizId);
     const { participants } = useParticipantsSubscription(quizId);
-    const { nextQuestion, endQuiz } = useQuiz();
+    const { nextQuestion, endQuiz, restartQuiz } = useQuiz();
 
     const [transitioning, setTransitioning] = useState(false);
 
@@ -23,8 +23,7 @@ const QuizControl = () => {
         try {
             const hasMore = await nextQuestion(quizId, quiz.currentQuestionIndex, questions.length);
             if (!hasMore) {
-                // Quiz ended
-                navigate(`/admin/quiz/${quizId}/results`);
+                // Quiz ended - stay on control page to see results
             }
         } catch (error) {
             console.error('Error moving to next question:', error);
@@ -38,11 +37,23 @@ const QuizControl = () => {
 
         try {
             await endQuiz(quizId);
-            navigate(`/admin/quiz/${quizId}/results`);
         } catch (error) {
             console.error('Error ending quiz:', error);
             alert('Failed to end quiz');
         }
+    };
+
+    const handleRestartQuiz = async () => {
+        if (!window.confirm('Restart quiz? This will reset all participant scores and start fresh.')) return;
+
+        setTransitioning(true);
+        try {
+            await restartQuiz(quizId);
+        } catch (error) {
+            console.error('Error restarting quiz:', error);
+            alert('Failed to restart quiz');
+        }
+        setTransitioning(false);
     };
 
     if (quizLoading) {
@@ -126,17 +137,15 @@ const QuizControl = () => {
                                 <div className="current-question-card">
                                     <h2 className="question-text">{currentQuestion.text}</h2>
 
+                                    {/* Options - DON'T show correct answer during live quiz */}
                                     <div className="options-display">
                                         {currentQuestion.options.map((option, idx) => (
                                             <div
                                                 key={idx}
-                                                className={`option-display ${idx === currentQuestion.correctAnswer ? 'correct-answer' : ''}`}
+                                                className="option-display"
                                             >
                                                 <span className="option-letter">{optionLabels[idx]}</span>
                                                 <span className="option-text">{option}</span>
-                                                {idx === currentQuestion.correctAnswer && (
-                                                    <span className="correct-mark">✓</span>
-                                                )}
                                             </div>
                                         ))}
                                     </div>
@@ -165,17 +174,40 @@ const QuizControl = () => {
                             </div>
                         )}
 
-                        {/* Ended State */}
+                        {/* Ended State - NOW show correct answers */}
                         {quiz.status === 'ended' && (
                             <div className="ended-state">
                                 <div className="ended-icon">🏆</div>
                                 <h2>Quiz Ended!</h2>
-                                <button
-                                    className="btn btn-primary btn-large"
-                                    onClick={() => navigate(`/admin/quiz/${quizId}/results`)}
-                                >
-                                    View Results
-                                </button>
+
+                                {/* Show all questions with correct answers */}
+                                <div className="questions-review">
+                                    <h3>Answer Key</h3>
+                                    {questions.map((q, qIdx) => (
+                                        <div key={qIdx} className="review-question">
+                                            <p className="review-q-text"><strong>Q{qIdx + 1}:</strong> {q.text}</p>
+                                            <p className="review-answer">
+                                                ✓ Correct: <strong>{optionLabels[q.correctAnswer]}) {q.options[q.correctAnswer]}</strong>
+                                            </p>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="control-actions" style={{ marginTop: '20px' }}>
+                                    <button
+                                        className="btn btn-primary btn-large"
+                                        onClick={() => navigate(`/admin/quiz/${quizId}/results`)}
+                                    >
+                                        📊 View Full Results
+                                    </button>
+                                    <button
+                                        className="btn btn-secondary btn-large"
+                                        onClick={handleRestartQuiz}
+                                        disabled={transitioning}
+                                    >
+                                        {transitioning ? 'Restarting...' : '🔄 Restart Quiz'}
+                                    </button>
+                                </div>
                             </div>
                         )}
                     </div>
@@ -195,3 +227,4 @@ const QuizControl = () => {
 };
 
 export default QuizControl;
+

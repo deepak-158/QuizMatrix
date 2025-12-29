@@ -2020,3 +2020,50 @@ img {
     grid-template-columns: 1fr 1fr;
   }
 }
+
+/* ============================================================================
+   QUESTIONS REVIEW / ANSWER KEY (shown after quiz ends)
+   ============================================================================ */
+.questions-review {
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  margin-top: var(--space-lg);
+  max-height: 400px;
+  overflow-y: auto;
+  text-align: left;
+}
+
+.questions-review h3 {
+  font-size: var(--font-size-lg);
+  margin-bottom: var(--space-md);
+  color: var(--color-primary);
+  text-align: center;
+}
+
+.review-question {
+  background: var(--bg-card);
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-md);
+  border-left: 3px solid var(--color-primary);
+}
+
+.review-question:last-child {
+  margin-bottom: 0;
+}
+
+.review-q-text {
+  font-size: var(--font-size-md);
+  margin-bottom: var(--space-sm);
+  color: var(--text-primary);
+}
+
+.review-answer {
+  font-size: var(--font-size-sm);
+  color: var(--color-success);
+}
+
+.review-answer strong {
+  color: var(--text-primary);
+}

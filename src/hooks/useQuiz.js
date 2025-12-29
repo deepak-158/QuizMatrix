@@ -184,6 +184,31 @@ export const useQuiz = () => {
         });
     };
 
+    // Restart the quiz - reset to waiting state and clear all scores
+    const restartQuiz = async (quizId) => {
+        // Reset quiz to waiting state
+        await updateQuiz(quizId, {
+            status: 'waiting',
+            currentQuestionIndex: -1,
+            questionStartTime: null
+        });
+
+        // Reset all participant scores and answered questions
+        const participantsRef = collection(db, 'quizzes', quizId, 'participants');
+        const participantsSnap = await getDocs(participantsRef);
+
+        const resetPromises = participantsSnap.docs.map(participantDoc =>
+            updateDoc(participantDoc.ref, {
+                score: 0,
+                answeredQuestions: []
+            })
+        );
+        await Promise.all(resetPromises);
+
+        // Delete all responses
+        await deleteSubcollection(quizId, 'responses');
+    };
+
     // ============================================================================
     // PARTICIPANT OPERATIONS
     // ============================================================================
@@ -270,6 +295,7 @@ export const useQuiz = () => {
         startQuiz,
         nextQuestion,
         endQuiz,
+        restartQuiz,
 
         // Participant operations
         joinQuiz,
