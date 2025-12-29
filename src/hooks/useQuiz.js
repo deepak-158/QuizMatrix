@@ -286,30 +286,49 @@ export const useQuiz = () => {
 export const useAdminQuizzes = () => {
     const [quizzes, setQuizzes] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
     const { user } = useAuth();
 
     useEffect(() => {
-        if (!user) return;
+        if (!user) {
+            setLoading(false);
+            return;
+        }
 
+        // Simple query without orderBy to avoid composite index requirement
         const q = query(
             collection(db, 'quizzes'),
-            where('createdBy', '==', user.uid),
-            orderBy('createdAt', 'desc')
+            where('createdBy', '==', user.uid)
         );
 
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const quizzesData = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            }));
-            setQuizzes(quizzesData);
-            setLoading(false);
-        });
+        const unsubscribe = onSnapshot(
+            q,
+            (snapshot) => {
+                const quizzesData = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                // Sort client-side by createdAt (newest first)
+                quizzesData.sort((a, b) => {
+                    const aTime = a.createdAt?.toDate?.() || new Date(0);
+                    const bTime = b.createdAt?.toDate?.() || new Date(0);
+                    return bTime - aTime;
+                });
+                setQuizzes(quizzesData);
+                setLoading(false);
+                setError(null);
+            },
+            (err) => {
+                console.error('Error fetching quizzes:', err);
+                setError(err.message);
+                setLoading(false);
+            }
+        );
 
         return () => unsubscribe();
     }, [user]);
 
-    return { quizzes, loading };
+    return { quizzes, loading, error };
 };
 
 // Hook to subscribe to a single quiz
