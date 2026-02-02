@@ -137,6 +137,13 @@ const QuizControl = () => {
                                 <div className="current-question-card">
                                     <h2 className="question-text">{currentQuestion.text}</h2>
 
+                                    {/* Question Image */}
+                                    {currentQuestion.imageUrl && (
+                                        <div className="question-image-display">
+                                            <img src={currentQuestion.imageUrl} alt="Question" style={{ maxWidth: '100%', maxHeight: '300px', marginTop: '15px', borderRadius: '4px' }} />
+                                        </div>
+                                    )}
+
                                     {/* Options - DON'T show correct answer during live quiz */}
                                     <div className="options-display">
                                         {currentQuestion.options.map((option, idx) => (

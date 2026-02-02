@@ -38,6 +38,7 @@ export const useQuiz = () => {
             createdBy: user.uid,
             status: 'draft',
             currentQuestionIndex: -1,
+            quizStartTime: null,
             questionStartTime: null,
             createdAt: serverTimestamp()
         };
@@ -151,7 +152,8 @@ export const useQuiz = () => {
     const startQuiz = async (quizId) => {
         await updateQuiz(quizId, {
             status: 'waiting',
-            currentQuestionIndex: -1
+            currentQuestionIndex: -1,
+            quizStartTime: null
         });
     };
 
@@ -168,12 +170,18 @@ export const useQuiz = () => {
             return false;
         }
 
-        await updateQuiz(quizId, {
+        const updateData = {
             status: 'live',
             currentQuestionIndex: nextIndex,
             questionStartTime: serverTimestamp()
-        });
+        };
 
+        // Set quiz start time only on first question
+        if (nextIndex === 0) {
+            updateData.quizStartTime = serverTimestamp();
+        }
+
+        await updateQuiz(quizId, updateData);
         return true;
     };
 
@@ -238,7 +246,7 @@ export const useQuiz = () => {
     };
 
     // Submit an answer
-    const submitAnswer = async (quizId, questionIndex, selectedAnswer, timeTaken, isCorrect, maxTime) => {
+    const submitAnswer = async (quizId, questionIndex, selectedAnswer, timeTaken, isCorrect, totalQuizTime) => {
         // Add response document
         const responsesRef = collection(db, 'quizzes', quizId, 'responses');
         await addDoc(responsesRef, {
@@ -251,7 +259,7 @@ export const useQuiz = () => {
         });
 
         // Calculate and update score
-        const points = calculateScore(isCorrect, timeTaken, maxTime);
+        const points = calculateScore(isCorrect, timeTaken, totalQuizTime);
 
         const participantRef = doc(db, 'quizzes', quizId, 'participants', user.uid);
         const participantSnap = await getDoc(participantRef);

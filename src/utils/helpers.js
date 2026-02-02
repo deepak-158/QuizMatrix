@@ -26,11 +26,12 @@ export const formatDateTime = (timestamp) => {
 
 // Calculate score based on time taken (faster = more points)
 // Base score: 100, bonus up to 50 for speed
-export const calculateScore = (isCorrect, timeTaken, maxTime) => {
+export const calculateScore = (isCorrect, timeTaken, totalTime) => {
     if (!isCorrect) return 0;
 
     const baseScore = 100;
-    const speedBonus = Math.floor((1 - timeTaken / maxTime) * 50);
+    // Calculate speed bonus based on time taken vs total time
+    const speedBonus = Math.floor((1 - timeTaken / totalTime) * 50);
 
     return baseScore + Math.max(0, speedBonus);
 };
@@ -100,8 +101,8 @@ export const validateQuizData = (quiz) => {
         errors.push('Quiz title must be at least 3 characters');
     }
 
-    if (!quiz.timePerQuestion || quiz.timePerQuestion < 5 || quiz.timePerQuestion > 120) {
-        errors.push('Time per question must be between 5 and 120 seconds');
+    if (!quiz.totalTime || quiz.totalTime < 60 || quiz.totalTime > 3600) {
+        errors.push('Total quiz duration must be between 60 and 3600 seconds');
     }
 
     return errors;

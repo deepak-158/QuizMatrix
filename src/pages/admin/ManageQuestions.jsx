@@ -1,7 +1,7 @@
 // Manage Questions Page - Add, edit, and delete quiz questions
 // Each question has text, 4 options, and correct answer selection
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Header from '../../components/Header';
 import LoadingSpinner from '../../components/LoadingSpinner';
@@ -19,17 +19,31 @@ const ManageQuestions = () => {
     const [editingQuestion, setEditingQuestion] = useState(null);
     const [formData, setFormData] = useState({
         text: '',
+        imageUrl: '',
         options: ['', '', '', ''],
         correctAnswer: -1
     });
     const [errors, setErrors] = useState([]);
     const [saving, setSaving] = useState(false);
 
+    const resetForm = useCallback(() => {
+        setFormData({
+            text: '',
+            imageUrl: '',
+            options: ['', '', '', ''],
+            correctAnswer: -1
+        });
+        setErrors([]);
+        setShowForm(false);
+        setEditingQuestion(null);
+    }, []);
+
     // Reset form when editing question changes
     useEffect(() => {
         if (editingQuestion) {
             setFormData({
                 text: editingQuestion.text,
+                imageUrl: editingQuestion.imageUrl || '',
                 options: [...editingQuestion.options],
                 correctAnswer: editingQuestion.correctAnswer
             });
@@ -37,21 +51,15 @@ const ManageQuestions = () => {
         } else {
             resetForm();
         }
-    }, [editingQuestion]);
-
-    const resetForm = () => {
-        setFormData({
-            text: '',
-            options: ['', '', '', ''],
-            correctAnswer: -1
-        });
-        setErrors([]);
-        setShowForm(false);
-        setEditingQuestion(null);
-    };
+    }, [editingQuestion, resetForm]);
 
     const handleTextChange = (e) => {
         setFormData(prev => ({ ...prev, text: e.target.value }));
+        setErrors([]);
+    };
+
+    const handleImageChange = (e) => {
+        setFormData(prev => ({ ...prev, imageUrl: e.target.value }));
         setErrors([]);
     };
 
@@ -193,6 +201,11 @@ const ManageQuestions = () => {
                                         <div className="question-number">Q{idx + 1}</div>
                                         <div className="question-content">
                                             <p className="question-text">{question.text}</p>
+                                            {question.imageUrl && (
+                                                <div className="question-image-preview">
+                                                    <img src={question.imageUrl} alt="Question" style={{ maxWidth: '100%', maxHeight: '150px', marginTop: '8px', borderRadius: '4px' }} />
+                                                </div>
+                                            )}
                                             <div className="options-preview">
                                                 {question.options.map((opt, optIdx) => (
                                                     <span
@@ -259,6 +272,23 @@ const ManageQuestions = () => {
                                         rows={3}
                                         autoFocus
                                     />
+                                </div>
+
+                                {/* Question Image */}
+                                <div className="form-group">
+                                    <label>Question Image (Optional)</label>
+                                    <input
+                                        type="text"
+                                        value={formData.imageUrl}
+                                        onChange={handleImageChange}
+                                        placeholder="Paste image URL here (e.g., https://example.com/image.jpg)"
+                                    />
+                                    {formData.imageUrl && (
+                                        <div className="image-preview">
+                                            <img src={formData.imageUrl} alt="Question preview" style={{ maxWidth: '100%', maxHeight: '200px', marginTop: '10px', borderRadius: '4px' }} />
+                                        </div>
+                                    )}
+                                    <span className="hint">Add an image to your question by pasting a direct image URL</span>
                                 </div>
 
                                 {/* Options */}

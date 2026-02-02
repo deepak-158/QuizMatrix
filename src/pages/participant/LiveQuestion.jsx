@@ -17,7 +17,7 @@ const LiveQuestion = () => {
     const { quiz, loading: quizLoading } = useQuizSubscription(quizId);
     const { questions } = useQuestionsSubscription(quizId);
     const { participants } = useParticipantsSubscription(quizId);
-    const { submitAnswer, hasAnswered: checkHasAnswered, joinQuiz } = useQuiz();
+    const { submitAnswer, hasAnswered: checkHasAnswered, joinQuiz, nextQuestion } = useQuiz();
 
     const [selectedAnswer, setSelectedAnswer] = useState(null);
     const [hasAnswered, setHasAnswered] = useState(false);
@@ -27,6 +27,7 @@ const LiveQuestion = () => {
     const [wasCorrect, setWasCorrect] = useState(false);
     const [answerStartTime, setAnswerStartTime] = useState(null);
     const [lastQuestionIndex, setLastQuestionIndex] = useState(-1);
+    const [movingToNext, setMovingToNext] = useState(false);
 
     // Get current participant data
     const currentParticipant = participants.find(p => p.oduid === user?.uid);
@@ -63,6 +64,24 @@ const LiveQuestion = () => {
             setLastPoints(0);
         }
     }, [hasAnswered]);
+
+    // Handle moving to next question
+    const handleMoveToNextQuestion = async () => {
+        if (!questions || quiz.currentQuestionIndex >= questions.length - 1) return;
+
+        setMovingToNext(true);
+        try {
+            await nextQuestion(quizId, quiz.currentQuestionIndex, questions.length);
+            // Reset states for next question
+            setSelectedAnswer(null);
+            setHasAnswered(false);
+            setShowResult(false);
+        } catch (error) {
+            console.error('Error moving to next question:', error);
+            alert('Failed to move to next question');
+        }
+        setMovingToNext(false);
+    };
 
     // Handle answer selection
     const handleSelectAnswer = (optionIndex) => {
@@ -104,7 +123,7 @@ const LiveQuestion = () => {
                 selectedAnswer,
                 timeTaken,
                 isCorrect,
-                quiz.timePerQuestion
+                quiz.totalTime
             );
 
             setHasAnswered(true);
@@ -177,7 +196,7 @@ const LiveQuestion = () => {
                         <p>The host will start the quiz shortly</p>
                         <div className="quiz-info">
                             <span><strong>{quiz.title}</strong></span>
-                            <span>{questions.length} questions · {quiz.timePerQuestion}s each</span>
+                            <span>{questions.length} questions · {Math.floor(quiz.totalTime / 60)}m total time</span>
                         </div>
                         <div className="participant-list">
                             <h4>Participants ({participants.length})</h4>
@@ -235,8 +254,8 @@ const LiveQuestion = () => {
 
                 {/* Timer */}
                 <Timer
-                    startTime={quiz.questionStartTime}
-                    duration={quiz.timePerQuestion}
+                    startTime={quiz.quizStartTime}
+                    duration={quiz.totalTime}
                     onTimeUp={handleTimeUp}
                     isActive={!hasAnswered}
                 />
@@ -244,6 +263,13 @@ const LiveQuestion = () => {
                 {/* Question Card */}
                 <div className={`question-card ${showResult ? 'show-result' : ''}`}>
                     <h2 className="question-text">{currentQuestion.text}</h2>
+
+                    {/* Question Image */}
+                    {currentQuestion.imageUrl && (
+                        <div className="question-image-display">
+                            <img src={currentQuestion.imageUrl} alt="Question" style={{ maxWidth: '100%', maxHeight: '300px', marginTop: '15px', borderRadius: '4px' }} />
+                        </div>
+                    )}
 
                     {/* Answer Options */}
                     <div className="options-grid">
@@ -306,7 +332,22 @@ const LiveQuestion = () => {
 
                     {/* Waiting for next question */}
                     {hasAnswered && (
-                        <p className="waiting-next">Waiting for next question...</p>
+                        <div className="answered-actions">
+                            {quiz.currentQuestionIndex < questions.length - 1 ? (
+                                <>
+                                    <p className="waiting-next">Answer submitted!</p>
+                                    <button
+                                        className="btn btn-primary btn-large"
+                                        onClick={handleMoveToNextQuestion}
+                                        disabled={movingToNext}
+                                    >
+                                        {movingToNext ? 'Loading...' : '➡️ Next Question'}
+                                    </button>
+                                </>
+                            ) : (
+                                <p className="waiting-next">Waiting for quiz to end...</p>
+                            )}
+                        </div>
                     )}
                 </div>
             </main>

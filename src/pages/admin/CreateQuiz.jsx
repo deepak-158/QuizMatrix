@@ -13,7 +13,7 @@ const CreateQuiz = () => {
 
     const [formData, setFormData] = useState({
         title: '',
-        timePerQuestion: 30
+        totalTime: 300
     });
     const [errors, setErrors] = useState([]);
     const [saving, setSaving] = useState(false);
@@ -22,7 +22,7 @@ const CreateQuiz = () => {
         const { name, value } = e.target;
         setFormData(prev => ({
             ...prev,
-            [name]: name === 'timePerQuestion' ? parseInt(value) || 30 : value
+            [name]: name === 'totalTime' ? parseInt(value) || 300 : value
         }));
         setErrors([]);
     };
@@ -95,35 +95,35 @@ const CreateQuiz = () => {
                             <span className="hint">Give your quiz a descriptive name</span>
                         </div>
 
-                        {/* Time per Question */}
+                        {/* Total Quiz Time */}
                         <div className="form-group">
-                            <label htmlFor="timePerQuestion">Time per Question (seconds) *</label>
+                            <label htmlFor="totalTime">Total Quiz Duration (seconds) *</label>
                             <div className="time-input">
                                 <input
                                     type="range"
-                                    id="timePerQuestion"
-                                    name="timePerQuestion"
-                                    min="5"
-                                    max="120"
-                                    step="5"
-                                    value={formData.timePerQuestion}
+                                    id="totalTime"
+                                    name="totalTime"
+                                    min="60"
+                                    max="3600"
+                                    step="30"
+                                    value={formData.totalTime}
                                     onChange={handleChange}
                                 />
-                                <span className="time-display">{formData.timePerQuestion}s</span>
+                                <span className="time-display">{Math.floor(formData.totalTime / 60)}m {formData.totalTime % 60}s</span>
                             </div>
-                            <span className="hint">How long participants have to answer each question</span>
+                            <span className="hint">Total time for participants to answer all questions</span>
                         </div>
 
                         {/* Time Presets */}
                         <div className="time-presets">
-                            {[10, 15, 30, 45, 60].map(time => (
+                            {[300, 600, 900, 1200, 1800].map(time => (
                                 <button
                                     key={time}
                                     type="button"
-                                    className={`preset-btn ${formData.timePerQuestion === time ? 'active' : ''}`}
-                                    onClick={() => setFormData(prev => ({ ...prev, timePerQuestion: time }))}
+                                    className={`preset-btn ${formData.totalTime === time ? 'active' : ''}`}
+                                    onClick={() => setFormData(prev => ({ ...prev, totalTime: time }))}
                                 >
-                                    {time}s
+                                    {Math.floor(time / 60)}m
                                 </button>
                             ))}
                         </div>
@@ -135,6 +135,7 @@ const CreateQuiz = () => {
                                 <li>A unique quiz code will be generated</li>
                                 <li>You'll add questions to your quiz</li>
                                 <li>Share the code with participants</li>
+                                <li>Participants have the total time to answer all questions</li>
                                 <li>Start the quiz when everyone has joined!</li>
                             </ul>
                         </div>

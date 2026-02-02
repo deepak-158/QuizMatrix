@@ -4,8 +4,8 @@
 import { useState, useEffect } from 'react';
 
 const Timer = ({
-    startTime,           // Server timestamp when question started
-    duration,            // Duration in seconds
+    startTime,           // Server timestamp when quiz started
+    duration,            // Total quiz duration in seconds
     onTimeUp,           // Callback when time runs out
     isActive = true     // Whether timer should be running
 }) => {
@@ -15,7 +15,7 @@ const Timer = ({
     useEffect(() => {
         if (!isActive || hasEnded) return;
 
-        // Calculate initial time left based on server timestamp
+        // Calculate remaining time based on quiz start time
         const calculateTimeLeft = () => {
             if (!startTime) return duration;
 
@@ -45,7 +45,7 @@ const Timer = ({
         return () => clearInterval(interval);
     }, [startTime, duration, isActive, onTimeUp, hasEnded]);
 
-    // Reset when startTime changes (new question)
+    // Reset when startTime changes
     useEffect(() => {
         setHasEnded(false);
         setTimeLeft(duration);
@@ -61,13 +61,20 @@ const Timer = ({
         return 'timer-red';
     };
 
+    // Format time as MM:SS
+    const formatTime = (seconds) => {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    };
+
     return (
         <div className="timer-container">
             <div className="timer-display">
                 <span className={`timer-text ${getTimerColor()}`}>
-                    {timeLeft}
+                    {formatTime(timeLeft)}
                 </span>
-                <span className="timer-label">seconds</span>
+                <span className="timer-label">remaining</span>
             </div>
             <div className="timer-bar-container">
                 <div

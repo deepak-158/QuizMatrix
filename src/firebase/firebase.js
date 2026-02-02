@@ -4,6 +4,7 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { getFirestore, serverTimestamp } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 
 // =============================================================================
 // FIREBASE CONFIGURATION
@@ -41,6 +42,9 @@ export const googleProvider = new GoogleAuthProvider();
 
 // Initialize Firestore Database
 export const db = getFirestore(app);
+
+// Initialize Firebase Storage
+export const storage = getStorage(app);
 
 // Server timestamp for synchronized timing
 export const getServerTimestamp = () => serverTimestamp();
