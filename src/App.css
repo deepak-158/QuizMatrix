@@ -5,11 +5,16 @@
   text-align: center;
 }
 
-.logo {
+/* .logo {
   height: 6em;
   padding: 1.5em;
   will-change: filter;
   transition: filter 300ms;
+  background-image: url("/public/favicon.ico");
+} */
+
+.logo img{
+  border-radius: 50px;
 }
 .logo:hover {
   filter: drop-shadow(0 0 2em #646cffaa);
@@ -40,3 +45,4 @@
 .read-the-docs {
   color: #888;
 }
+

@@ -23,7 +23,7 @@ const Header = () => {
                 {/* Logo and Brand */}
                 <Link to={isAdmin ? '/admin' : '/join'} className="brand">
                     <div className="logo">
-                        <span className="logo-icon">◆</span>
+                        <img src="/favicon.ico" alt="Matrix Club Logo" className="logo-image" />
                     </div>
                     <div className="brand-text">
                         <h1>Matrix Club</h1>

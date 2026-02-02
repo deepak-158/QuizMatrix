@@ -26,6 +26,7 @@ const LiveQuestion = () => {
     const [lastPoints, setLastPoints] = useState(0);
     const [wasCorrect, setWasCorrect] = useState(false);
     const [answerStartTime, setAnswerStartTime] = useState(null);
+    const [lastQuestionIndex, setLastQuestionIndex] = useState(-1);
 
     // Get current participant data
     const currentParticipant = participants.find(p => p.oduid === user?.uid);
@@ -39,17 +40,19 @@ const LiveQuestion = () => {
 
     // Check if already answered when question changes
     useEffect(() => {
-        const checkAnswered = async () => {
-            if (quiz && quiz.currentQuestionIndex >= 0) {
+        // Only trigger when question index actually changes
+        if (quiz && quiz.currentQuestionIndex >= 0 && quiz.currentQuestionIndex !== lastQuestionIndex) {
+            const checkAnswered = async () => {
                 const answered = await checkHasAnswered(quizId, quiz.currentQuestionIndex);
                 setHasAnswered(answered);
                 setSelectedAnswer(null);
                 setShowResult(false);
                 setAnswerStartTime(quiz.questionStartTime);
-            }
-        };
-        checkAnswered();
-    }, [quiz?.currentQuestionIndex, quizId, checkHasAnswered, quiz?.questionStartTime]);
+                setLastQuestionIndex(quiz.currentQuestionIndex);
+            };
+            checkAnswered();
+        }
+    }, [quiz?.currentQuestionIndex, quizId, checkHasAnswered, lastQuestionIndex]);
 
     // Handle time running out
     const handleTimeUp = useCallback(() => {
