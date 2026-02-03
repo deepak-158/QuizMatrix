@@ -660,6 +660,7 @@ const LiveQuestion = () => {
 
                 {/* Timer - Separate from question content to prevent re-renders */}
                 <Timer
+                    key={`timer-${currentQuestionIndex}-${timerStartTime?.seconds || timerStartTime}`}
                     startTime={timerStartTime}
                     duration={timerDuration}
                     onTimeUp={handleTimeUp}

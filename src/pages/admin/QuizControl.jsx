@@ -201,6 +201,7 @@ const QuizControl = () => {
 
                                 {/* Timer for admin - auto-advances when time is up */}
                                 <Timer
+                                    key={`timer-${quiz.currentQuestionIndex}-${quiz.questionStartTime?.seconds || quiz.questionStartTime}`}
                                     startTime={quiz.questionStartTime}
                                     duration={quiz.timePerQuestion}
                                     isActive={true}
