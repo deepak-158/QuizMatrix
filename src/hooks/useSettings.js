@@ -60,15 +60,24 @@ export const useSettings = () => {
     };
 
     const addAdmin = async (email) => {
-        const settingsRef = doc(db, 'settings', 'app');
-        const docSnap = await getDoc(settingsRef);
-        const currentAdmins = docSnap.exists() ? (docSnap.data().adminEmails || []) : ADMIN_EMAILS;
+        try {
+            const settingsRef = doc(db, 'settings', 'app');
+            const docSnap = await getDoc(settingsRef);
+            const currentAdmins = docSnap.exists() ? (docSnap.data().adminEmails || []) : ADMIN_EMAILS;
 
-        const normalizedEmail = email.toLowerCase().trim();
-        if (!currentAdmins.includes(normalizedEmail)) {
+            const normalizedEmail = email.toLowerCase().trim();
+            if (currentAdmins.some(e => e.toLowerCase() === normalizedEmail)) {
+                throw new Error('This email is already an admin');
+            }
+            
             await setDoc(settingsRef, {
                 adminEmails: [...currentAdmins, normalizedEmail]
             }, { merge: true });
+            
+            console.log('Admin added successfully:', normalizedEmail);
+        } catch (error) {
+            console.error('Error adding admin:', error);
+            throw error;
         }
     };
 

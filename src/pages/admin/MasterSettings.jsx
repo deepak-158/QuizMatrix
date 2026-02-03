@@ -18,6 +18,7 @@ const MasterSettings = () => {
     const [newClubName, setNewClubName] = useState('');
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
+    const [success, setSuccess] = useState('');
 
     // Redirect non-master admins
     if (!isMasterAdmin) {
@@ -42,12 +43,15 @@ const MasterSettings = () => {
     const handleAddAdmin = async () => {
         if (!newAdminEmail.trim()) return;
         setError('');
+        setSuccess('');
         setSaving(true);
         try {
             await addAdmin(newAdminEmail);
+            setSuccess(`Successfully added ${newAdminEmail} as admin!`);
             setNewAdminEmail('');
         } catch (err) {
-            setError(err.message);
+            console.error('Add admin error:', err);
+            setError(err.message || 'Failed to add admin');
         }
         setSaving(false);
     };
@@ -104,6 +108,12 @@ const MasterSettings = () => {
                 {error && (
                     <div className="error-box">
                         <p>⚠️ {error}</p>
+                    </div>
+                )}
+
+                {success && (
+                    <div className="success-box">
+                        <p>✅ {success}</p>
                     </div>
                 )}
 
