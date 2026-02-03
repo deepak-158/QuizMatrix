@@ -7,7 +7,7 @@ import {
     signOut,
     onAuthStateChanged
 } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
 import { auth, googleProvider, db, ADMIN_EMAILS, MASTER_ADMIN_EMAIL } from '../firebase/firebase';
 
 // Create the Auth Context
@@ -28,12 +28,26 @@ export const AuthProvider = ({ children }) => {
     const [isAdmin, setIsAdmin] = useState(false);
     const [isMasterAdmin, setIsMasterAdmin] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [adminEmails, setAdminEmails] = useState(ADMIN_EMAILS);
 
-    // Check if email is in admin whitelist
-    const checkAdminStatus = (email) => {
+    // Listen to admin emails from Firestore settings
+    useEffect(() => {
+        const settingsRef = doc(db, 'settings', 'app');
+        const unsubscribe = onSnapshot(settingsRef, (docSnap) => {
+            if (docSnap.exists() && docSnap.data().adminEmails) {
+                setAdminEmails(docSnap.data().adminEmails);
+            }
+        }, (error) => {
+            console.error('Error fetching admin emails:', error);
+        });
+        return () => unsubscribe();
+    }, []);
+
+    // Check if email is in admin whitelist (uses dynamic adminEmails)
+    const checkAdminStatus = (email, admins = adminEmails) => {
         if (!email) return false;
         const normalizedEmail = email.toLowerCase();
-        return ADMIN_EMAILS.some(e => e.toLowerCase() === normalizedEmail) ||
+        return admins.some(e => e.toLowerCase() === normalizedEmail) ||
             normalizedEmail === MASTER_ADMIN_EMAIL.toLowerCase();
     };
 
@@ -44,11 +58,11 @@ export const AuthProvider = ({ children }) => {
     };
 
     // Save or update user in Firestore
-    const saveUserToFirestore = async (firebaseUser) => {
+    const saveUserToFirestore = async (firebaseUser, admins) => {
         const userRef = doc(db, 'users', firebaseUser.uid);
         const userSnap = await getDoc(userRef);
 
-        const isUserAdmin = checkAdminStatus(firebaseUser.email);
+        const isUserAdmin = checkAdminStatus(firebaseUser.email, admins);
         const isUserMasterAdmin = checkMasterAdminStatus(firebaseUser.email);
 
         const userData = {
@@ -69,12 +83,29 @@ export const AuthProvider = ({ children }) => {
         return { isAdmin: isUserAdmin, isMasterAdmin: isUserMasterAdmin };
     };
 
+    // Re-check admin status when adminEmails changes
+    useEffect(() => {
+        if (user) {
+            const adminStatus = checkAdminStatus(user.email, adminEmails);
+            const masterStatus = checkMasterAdminStatus(user.email);
+            setIsAdmin(adminStatus);
+            setIsMasterAdmin(masterStatus);
+        }
+    }, [adminEmails, user]);
+
     // Listen to auth state changes
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
             if (firebaseUser) {
                 try {
-                    const { isAdmin: adminStatus, isMasterAdmin: masterStatus } = await saveUserToFirestore(firebaseUser);
+                    // First, fetch the latest admin emails from Firestore
+                    const settingsRef = doc(db, 'settings', 'app');
+                    const settingsSnap = await getDoc(settingsRef);
+                    const currentAdmins = settingsSnap.exists() && settingsSnap.data().adminEmails 
+                        ? settingsSnap.data().adminEmails 
+                        : ADMIN_EMAILS;
+                    
+                    const { isAdmin: adminStatus, isMasterAdmin: masterStatus } = await saveUserToFirestore(firebaseUser, currentAdmins);
                     setUser(firebaseUser);
                     setIsAdmin(adminStatus);
                     setIsMasterAdmin(masterStatus);
