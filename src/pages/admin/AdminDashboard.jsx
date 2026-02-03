@@ -1,19 +1,32 @@
 // Admin Dashboard - Main hub for quiz management
 // Lists all quizzes created by the admin with status indicators
+// Master Admin can see and manage ALL quizzes
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../../components/Header';
 import LoadingSpinner from '../../components/LoadingSpinner';
-import { useAdminQuizzes, useQuiz } from '../../hooks/useQuiz';
+import { useAdminQuizzes, useAllQuizzes, useQuiz } from '../../hooks/useQuiz';
+import { useAuth } from '../../context/AuthContext';
 import { formatDateTime, getStatusColor } from '../../utils/helpers';
 
 const AdminDashboard = () => {
-    const { quizzes, loading } = useAdminQuizzes();
+    const { user, isMasterAdmin } = useAuth();
+    
+    // Use different hooks based on master admin status
+    const adminQuizzes = useAdminQuizzes();
+    const allQuizzes = useAllQuizzes();
+    
+    // Select appropriate data based on master admin status
+    const { quizzes, loading } = isMasterAdmin ? allQuizzes : adminQuizzes;
+    
     const { deleteQuiz, restartQuiz, createQuizFromJSON } = useQuiz();
     const navigate = useNavigate();
     const [deleting, setDeleting] = useState(null);
     const [restarting, setRestarting] = useState(null);
+    const [showAllQuizzes, setShowAllQuizzes] = useState(true); // Toggle for master admin
+    const [selectedAdmin, setSelectedAdmin] = useState('all'); // Filter by admin
+    const [bulkDeleting, setBulkDeleting] = useState(false);
 
     // JSON import state
     const [showJsonModal, setShowJsonModal] = useState(false);
@@ -21,10 +34,80 @@ const AdminDashboard = () => {
     const [jsonError, setJsonError] = useState('');
     const [importing, setImporting] = useState(false);
 
-    const handleDeleteQuiz = async (quizId, e) => {
+    // Get unique admins from quizzes for filter dropdown
+    const uniqueAdmins = useMemo(() => {
+        if (!isMasterAdmin || !quizzes) return [];
+        const admins = new Map();
+        quizzes.forEach(q => {
+            if (q.createdBy && !admins.has(q.createdBy)) {
+                admins.set(q.createdBy, {
+                    id: q.createdBy,
+                    email: q.creatorEmail || 'Unknown Admin'
+                });
+            }
+        });
+        return Array.from(admins.values());
+    }, [quizzes, isMasterAdmin]);
+
+    // Filter quizzes based on master admin toggle and selected admin
+    const displayedQuizzes = useMemo(() => {
+        if (!isMasterAdmin) return quizzes;
+        
+        let filtered = showAllQuizzes ? quizzes : quizzes.filter(q => q.createdBy === user?.uid);
+        
+        // Apply admin filter
+        if (selectedAdmin !== 'all') {
+            filtered = filtered.filter(q => q.createdBy === selectedAdmin);
+        }
+        
+        return filtered;
+    }, [quizzes, isMasterAdmin, showAllQuizzes, selectedAdmin, user?.uid]);
+
+    // Bulk delete all filtered quizzes
+    const handleBulkDelete = async () => {
+        if (displayedQuizzes.length === 0) return;
+
+        const adminEmail = selectedAdmin === 'all' 
+            ? 'all admins' 
+            : uniqueAdmins.find(a => a.id === selectedAdmin)?.email || 'selected admin';
+
+        const confirmMessage = `⚠️ BULK DELETE WARNING\n\nYou are about to delete ${displayedQuizzes.length} quiz(es) from ${adminEmail}.\n\nThis action CANNOT be undone!\n\nType "DELETE" to confirm:`;
+        
+        const confirmation = window.prompt(confirmMessage);
+        if (confirmation !== 'DELETE') {
+            if (confirmation !== null) {
+                alert('Bulk delete cancelled. You must type "DELETE" exactly to confirm.');
+            }
+            return;
+        }
+
+        setBulkDeleting(true);
+        let deleted = 0;
+        let failed = 0;
+
+        for (const quiz of displayedQuizzes) {
+            try {
+                await deleteQuiz(quiz.id);
+                deleted++;
+            } catch (error) {
+                console.error(`Failed to delete quiz ${quiz.id}:`, error);
+                failed++;
+            }
+        }
+
+        setBulkDeleting(false);
+        alert(`Bulk delete complete!\n✓ Deleted: ${deleted}\n✗ Failed: ${failed}`);
+    };
+
+    const handleDeleteQuiz = async (quizId, quiz, e) => {
         e.stopPropagation();
 
-        if (!window.confirm('Are you sure you want to delete this quiz? This cannot be undone.')) {
+        const isOwnQuiz = quiz.createdBy === user?.uid;
+        const confirmMessage = isOwnQuiz
+            ? 'Are you sure you want to delete this quiz? This cannot be undone.'
+            : `⚠️ MASTER ADMIN DELETE\n\nThis quiz was created by: ${quiz.creatorEmail || 'Unknown'}\n\nAre you sure you want to delete it? This cannot be undone.`;
+
+        if (!window.confirm(confirmMessage)) {
             return;
         }
 
@@ -92,12 +175,29 @@ const AdminDashboard = () => {
 
     const sampleJSON = `{
   "title": "Sample Quiz",
+  "timeMode": "perQuestion",
   "timePerQuestion": 30,
   "questions": [
     {
       "text": "What is 2 + 2?",
       "options": ["3", "4", "5", "6"],
-      "correctAnswer": 1
+      "correctAnswer": 1,
+      "imageUrl": "",
+      "optionImages": ["", "", "", ""]
+    }
+  ]
+}`;
+
+    const sampleJSONOverall = `{
+  "title": "Self-Paced Quiz",
+  "timeMode": "overall",
+  "totalTime": 600,
+  "questions": [
+    {
+      "text": "Question with image?",
+      "imageUrl": "https://example.com/image.jpg",
+      "options": ["A", "B", "C", "D"],
+      "correctAnswer": 0
     }
   ]
 }`;
@@ -114,10 +214,23 @@ const AdminDashboard = () => {
                 {/* Dashboard Header */}
                 <div className="dashboard-header">
                     <div>
-                        <h1>My Quizzes</h1>
-                        <p>Create and manage your live quizzes</p>
+                        <h1>{isMasterAdmin && showAllQuizzes ? '👑 All Quizzes' : 'My Quizzes'}</h1>
+                        <p>{isMasterAdmin && showAllQuizzes 
+                            ? `Viewing ${displayedQuizzes.length} quiz(es)${selectedAdmin !== 'all' ? ' from selected admin' : ' from all admins'}`
+                            : 'Create and manage your live quizzes'}</p>
                     </div>
                     <div className="header-buttons">
+                        {isMasterAdmin && (
+                            <button
+                                className={`btn ${showAllQuizzes ? 'btn-accent' : 'btn-ghost'}`}
+                                onClick={() => {
+                                    setShowAllQuizzes(!showAllQuizzes);
+                                    setSelectedAdmin('all');
+                                }}
+                            >
+                                {showAllQuizzes ? '👑 All Quizzes' : '📋 My Quizzes'}
+                            </button>
+                        )}
                         <button
                             className="btn btn-secondary"
                             onClick={() => setShowJsonModal(true)}
@@ -132,6 +245,43 @@ const AdminDashboard = () => {
                         </button>
                     </div>
                 </div>
+
+                {/* Master Admin Filter Controls */}
+                {isMasterAdmin && showAllQuizzes && (
+                    <div className="master-admin-controls">
+                        <div className="filter-section">
+                            <label htmlFor="admin-filter">Filter by Admin:</label>
+                            <select
+                                id="admin-filter"
+                                className="admin-filter-select"
+                                value={selectedAdmin}
+                                onChange={(e) => setSelectedAdmin(e.target.value)}
+                            >
+                                <option value="all">All Admins ({quizzes.length} quizzes)</option>
+                                {uniqueAdmins.map(admin => {
+                                    const count = quizzes.filter(q => q.createdBy === admin.id).length;
+                                    return (
+                                        <option key={admin.id} value={admin.id}>
+                                            {admin.email} ({count} quizzes)
+                                        </option>
+                                    );
+                                })}
+                            </select>
+                        </div>
+                        
+                        <div className="bulk-actions">
+                            <button
+                                className="btn btn-danger"
+                                onClick={handleBulkDelete}
+                                disabled={bulkDeleting || displayedQuizzes.length === 0}
+                            >
+                                {bulkDeleting 
+                                    ? '🗑️ Deleting...' 
+                                    : `🗑️ Delete All (${displayedQuizzes.length})`}
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 {/* JSON Import Modal */}
                 {showJsonModal && (
@@ -160,9 +310,25 @@ const AdminDashboard = () => {
                                 />
 
                                 <details className="json-format-help">
-                                    <summary>📋 JSON Format Example</summary>
+                                    <summary>📋 JSON Format - Per Question Mode</summary>
                                     <pre>{sampleJSON}</pre>
                                 </details>
+
+                                <details className="json-format-help">
+                                    <summary>📋 JSON Format - Overall Time (Self-Paced)</summary>
+                                    <pre>{sampleJSONOverall}</pre>
+                                </details>
+
+                                <div className="json-fields-info">
+                                    <p><strong>Fields:</strong></p>
+                                    <ul>
+                                        <li><code>timeMode</code>: "perQuestion" or "overall"</li>
+                                        <li><code>timePerQuestion</code>: 10-120 seconds (per-question mode)</li>
+                                        <li><code>totalTime</code>: 60-3600 seconds (overall mode)</li>
+                                        <li><code>imageUrl</code>: Optional image URL for question</li>
+                                        <li><code>optionImages</code>: Optional array of 4 image URLs</li>
+                                    </ul>
+                                </div>
                             </div>
 
                             <div className="modal-footer">
@@ -182,7 +348,7 @@ const AdminDashboard = () => {
                 )}
 
                 {/* Quizzes Grid */}
-                {quizzes.length === 0 ? (
+                {displayedQuizzes.length === 0 ? (
                     <div className="empty-state">
                         <div className="empty-icon">📋</div>
                         <h2>No quizzes yet</h2>
@@ -196,83 +362,99 @@ const AdminDashboard = () => {
                     </div>
                 ) : (
                     <div className="quizzes-grid">
-                        {quizzes.map((quiz) => (
-                            <div
-                                key={quiz.id}
-                                className="quiz-card"
-                                onClick={() => navigate(`/admin/quiz/${quiz.id}`)}
-                            >
-                                {/* Status Badge */}
-                                <div className={`status-badge ${getStatusColor(quiz.status)}`}>
-                                    {getStatusLabel(quiz.status)}
-                                </div>
-
-                                {/* Quiz Info */}
-                                <h3 className="quiz-title">{quiz.title}</h3>
-
-                                <div className="quiz-meta">
-                                    <div className="meta-item">
-                                        <span className="meta-icon">❓</span>
-                                        <span>{quiz.totalQuestions || 0} questions</span>
+                        {displayedQuizzes.map((quiz) => {
+                            const isOwnQuiz = quiz.createdBy === user?.uid;
+                            
+                            return (
+                                <div
+                                    key={quiz.id}
+                                    className={`quiz-card ${!isOwnQuiz && isMasterAdmin ? 'other-admin-quiz' : ''}`}
+                                    onClick={() => navigate(`/admin/quiz/${quiz.id}`)}
+                                >
+                                    {/* Status Badge */}
+                                    <div className={`status-badge ${getStatusColor(quiz.status)}`}>
+                                        {getStatusLabel(quiz.status)}
                                     </div>
-                                    <div className="meta-item">
-                                        <span className="meta-icon">⏱️</span>
-                                        <span>{quiz.timePerQuestion}s per question</span>
+
+                                    {/* Owner Badge for Master Admin */}
+                                    {isMasterAdmin && showAllQuizzes && (
+                                        <div className={`owner-badge ${isOwnQuiz ? 'own' : 'other'}`}>
+                                            {isOwnQuiz ? '👤 Mine' : `👥 ${quiz.creatorEmail || 'Unknown Admin'}`}
+                                        </div>
+                                    )}
+
+                                    {/* Quiz Info */}
+                                    <h3 className="quiz-title">{quiz.title}</h3>
+
+                                    <div className="quiz-meta">
+                                        <div className="meta-item">
+                                            <span className="meta-icon">❓</span>
+                                            <span>{quiz.totalQuestions || 0} questions</span>
+                                        </div>
+                                        <div className="meta-item">
+                                            <span className="meta-icon">⏱️</span>
+                                            <span>
+                                                {quiz.timeMode === 'overall' 
+                                                    ? `${quiz.totalTime}s total` 
+                                                    : `${quiz.timePerQuestion}s per question`}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <div className="quiz-code">
+                                        <span>Code:</span>
+                                        <strong>{quiz.quizCode}</strong>
+                                    </div>
+
+                                    <div className="quiz-date">
+                                        Created: {formatDateTime(quiz.createdAt)}
+                                    </div>
+
+                                    {/* Actions */}
+                                    <div className="quiz-actions">
+                                        {quiz.status === 'draft' && (
+                                            <button
+                                                className="btn btn-small btn-secondary"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    navigate(`/admin/quiz/${quiz.id}/questions`);
+                                                }}
+                                            >
+                                                Add Questions
+                                            </button>
+                                        )}
+                                        {(quiz.status === 'waiting' || quiz.status === 'live') && (
+                                            <button
+                                                className="btn btn-small btn-accent"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    navigate(`/admin/quiz/${quiz.id}/control`);
+                                                }}
+                                            >
+                                                Control Panel
+                                            </button>
+                                        )}
+                                        {quiz.status === 'ended' && (
+                                            <button
+                                                className="btn btn-small btn-secondary"
+                                                onClick={(e) => handleRestartQuiz(quiz.id, e)}
+                                                disabled={restarting === quiz.id}
+                                            >
+                                                {restarting === quiz.id ? '...' : '🔄 Restart'}
+                                            </button>
+                                        )}
+                                        <button
+                                            className="btn btn-small btn-danger"
+                                            onClick={(e) => handleDeleteQuiz(quiz.id, quiz, e)}
+                                            disabled={deleting === quiz.id}
+                                            title={!isOwnQuiz ? 'Master Admin Delete' : 'Delete Quiz'}
+                                        >
+                                            {deleting === quiz.id ? '...' : '🗑️'}
+                                        </button>
                                     </div>
                                 </div>
-
-                                <div className="quiz-code">
-                                    <span>Code:</span>
-                                    <strong>{quiz.quizCode}</strong>
-                                </div>
-
-                                <div className="quiz-date">
-                                    Created: {formatDateTime(quiz.createdAt)}
-                                </div>
-
-                                {/* Actions */}
-                                <div className="quiz-actions">
-                                    {quiz.status === 'draft' && (
-                                        <button
-                                            className="btn btn-small btn-secondary"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                navigate(`/admin/quiz/${quiz.id}/questions`);
-                                            }}
-                                        >
-                                            Add Questions
-                                        </button>
-                                    )}
-                                    {(quiz.status === 'waiting' || quiz.status === 'live') && (
-                                        <button
-                                            className="btn btn-small btn-accent"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                navigate(`/admin/quiz/${quiz.id}/control`);
-                                            }}
-                                        >
-                                            Control Panel
-                                        </button>
-                                    )}
-                                    {quiz.status === 'ended' && (
-                                        <button
-                                            className="btn btn-small btn-secondary"
-                                            onClick={(e) => handleRestartQuiz(quiz.id, e)}
-                                            disabled={restarting === quiz.id}
-                                        >
-                                            {restarting === quiz.id ? '...' : '🔄 Restart'}
-                                        </button>
-                                    )}
-                                    <button
-                                        className="btn btn-small btn-danger"
-                                        onClick={(e) => handleDeleteQuiz(quiz.id, e)}
-                                        disabled={deleting === quiz.id}
-                                    >
-                                        {deleting === quiz.id ? '...' : '🗑️'}
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
             </main>
@@ -281,4 +463,3 @@ const AdminDashboard = () => {
 };
 
 export default AdminDashboard;
-

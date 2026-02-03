@@ -32,7 +32,9 @@ const ManageQuestions = () => {
     const [formData, setFormData] = useState({
         text: '',
         options: ['', '', '', ''],
-        correctAnswer: -1
+        correctAnswer: -1,
+        imageUrl: '',
+        optionImages: ['', '', '', '']
     });
     const [errors, setErrors] = useState([]);
     const [saving, setSaving] = useState(false);
@@ -66,7 +68,9 @@ const ManageQuestions = () => {
             setFormData({
                 text: editingQuestion.text,
                 options: [...editingQuestion.options],
-                correctAnswer: editingQuestion.correctAnswer
+                correctAnswer: editingQuestion.correctAnswer,
+                imageUrl: editingQuestion.imageUrl || '',
+                optionImages: editingQuestion.optionImages || ['', '', '', '']
             });
             setShowForm(true);
         } else {
@@ -78,7 +82,9 @@ const ManageQuestions = () => {
         setFormData({
             text: '',
             options: ['', '', '', ''],
-            correctAnswer: -1
+            correctAnswer: -1,
+            imageUrl: '',
+            optionImages: ['', '', '', '']
         });
         setErrors([]);
         setShowForm(false);
@@ -95,6 +101,16 @@ const ManageQuestions = () => {
         newOptions[index] = value;
         setFormData(prev => ({ ...prev, options: newOptions }));
         setErrors([]);
+    };
+
+    const handleImageUrlChange = (e) => {
+        setFormData(prev => ({ ...prev, imageUrl: e.target.value }));
+    };
+
+    const handleOptionImageChange = (index, value) => {
+        const newOptionImages = [...formData.optionImages];
+        newOptionImages[index] = value;
+        setFormData(prev => ({ ...prev, optionImages: newOptionImages }));
     };
 
     const handleCorrectAnswerChange = (index) => {
@@ -617,6 +633,11 @@ const ManageQuestions = () => {
                                         <div className="question-number">Q{idx + 1}</div>
                                         <div className="question-content">
                                             <p className="question-text">{question.text}</p>
+                                            {question.imageUrl && (
+                                                <div className="question-image-preview">
+                                                    <img src={question.imageUrl} alt="Question" />
+                                                </div>
+                                            )}
                                             <div className="options-preview">
                                                 {question.options.map((opt, optIdx) => (
                                                     <span
@@ -624,6 +645,7 @@ const ManageQuestions = () => {
                                                         className={`option-tag ${optIdx === question.correctAnswer ? 'correct' : ''}`}
                                                     >
                                                         {optionLabels[optIdx]}: {opt}
+                                                        {question.optionImages?.[optIdx] && ' 🖼️'}
                                                     </span>
                                                 ))}
                                             </div>
@@ -685,6 +707,26 @@ const ManageQuestions = () => {
                                     />
                                 </div>
 
+                                {/* Question Image URL */}
+                                <div className="form-group">
+                                    <label>Question Image URL (optional)</label>
+                                    <input
+                                        type="url"
+                                        value={formData.imageUrl}
+                                        onChange={handleImageUrlChange}
+                                        placeholder="https://example.com/image.jpg"
+                                    />
+                                    {formData.imageUrl && (
+                                        <div className="image-preview">
+                                            <img 
+                                                src={formData.imageUrl} 
+                                                alt="Question preview" 
+                                                onError={(e) => e.target.style.display = 'none'}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+
                                 {/* Options */}
                                 <div className="form-group">
                                     <label>Answer Options (click to mark as correct) *</label>
@@ -696,13 +738,32 @@ const ManageQuestions = () => {
                                                 onClick={() => handleCorrectAnswerChange(idx)}
                                             >
                                                 <span className="option-letter">{optionLabels[idx]}</span>
-                                                <input
-                                                    type="text"
-                                                    value={option}
-                                                    onChange={(e) => handleOptionChange(idx, e.target.value)}
-                                                    placeholder={`Option ${optionLabels[idx]}`}
-                                                    onClick={(e) => e.stopPropagation()}
-                                                />
+                                                <div className="option-inputs">
+                                                    <input
+                                                        type="text"
+                                                        value={option}
+                                                        onChange={(e) => handleOptionChange(idx, e.target.value)}
+                                                        placeholder={`Option ${optionLabels[idx]}`}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    />
+                                                    <input
+                                                        type="url"
+                                                        value={formData.optionImages[idx]}
+                                                        onChange={(e) => handleOptionImageChange(idx, e.target.value)}
+                                                        placeholder="Image URL (optional)"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        className="option-image-input"
+                                                    />
+                                                    {formData.optionImages[idx] && (
+                                                        <div className="option-image-preview">
+                                                            <img 
+                                                                src={formData.optionImages[idx]} 
+                                                                alt={`Option ${optionLabels[idx]}`}
+                                                                onError={(e) => e.target.style.display = 'none'}
+                                                            />
+                                                        </div>
+                                                    )}
+                                                </div>
                                                 {formData.correctAnswer === idx && (
                                                     <span className="correct-badge">✓ Correct</span>
                                                 )}

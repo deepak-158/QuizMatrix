@@ -54,11 +54,26 @@ export const useQuiz = () => {
         if (!jsonData.title || typeof jsonData.title !== 'string') {
             throw new Error('Invalid JSON: "title" is required and must be a string');
         }
-        if (!jsonData.timePerQuestion || typeof jsonData.timePerQuestion !== 'number') {
-            throw new Error('Invalid JSON: "timePerQuestion" is required and must be a number');
-        }
         if (!Array.isArray(jsonData.questions) || jsonData.questions.length === 0) {
             throw new Error('Invalid JSON: "questions" must be a non-empty array');
+        }
+
+        // Validate time settings based on mode
+        const timeMode = jsonData.timeMode || 'perQuestion';
+        if (timeMode === 'overall') {
+            if (!jsonData.totalTime || typeof jsonData.totalTime !== 'number') {
+                throw new Error('Invalid JSON: "totalTime" is required for overall time mode');
+            }
+            if (jsonData.totalTime < 60 || jsonData.totalTime > 3600) {
+                throw new Error('Invalid JSON: "totalTime" must be between 60 and 3600 seconds');
+            }
+        } else {
+            if (!jsonData.timePerQuestion || typeof jsonData.timePerQuestion !== 'number') {
+                throw new Error('Invalid JSON: "timePerQuestion" is required for per-question mode');
+            }
+            if (jsonData.timePerQuestion < 10 || jsonData.timePerQuestion > 120) {
+                throw new Error('Invalid JSON: "timePerQuestion" must be between 10 and 120 seconds');
+            }
         }
 
         // Validate each question
@@ -73,13 +88,23 @@ export const useQuiz = () => {
             if (typeof q.correctAnswer !== 'number' || q.correctAnswer < 0 || q.correctAnswer > 3) {
                 throw new Error(`Invalid question ${i + 1}: "correctAnswer" must be 0, 1, 2, or 3`);
             }
+            // Validate imageUrl if provided
+            if (q.imageUrl && typeof q.imageUrl !== 'string') {
+                throw new Error(`Invalid question ${i + 1}: "imageUrl" must be a string`);
+            }
+            // Validate optionImages if provided
+            if (q.optionImages && (!Array.isArray(q.optionImages) || q.optionImages.length !== 4)) {
+                throw new Error(`Invalid question ${i + 1}: "optionImages" must be an array of 4 items`);
+            }
         }
 
         // Create the quiz
         const quizCode = generateQuizCode();
         const newQuiz = {
             title: jsonData.title,
-            timePerQuestion: jsonData.timePerQuestion,
+            timeMode: timeMode,
+            timePerQuestion: jsonData.timePerQuestion || 30,
+            totalTime: jsonData.totalTime || 300,
             quizCode,
             createdBy: user.uid,
             creatorEmail: user.email,
@@ -104,6 +129,8 @@ export const useQuiz = () => {
                     text: q.text,
                     options: q.options,
                     correctAnswer: q.correctAnswer,
+                    imageUrl: q.imageUrl || '',
+                    optionImages: q.optionImages || ['', '', '', ''],
                     index: i,
                     createdAt: serverTimestamp()
                 });
@@ -347,6 +374,15 @@ export const useQuiz = () => {
         return true;
     };
 
+    // Start self-paced quiz (all questions available at once)
+    const startSelfPacedQuiz = async (quizId) => {
+        await updateQuiz(quizId, {
+            status: 'live',
+            currentQuestionIndex: 0, // All questions available from index 0
+            quizStartTime: serverTimestamp()
+        });
+    };
+
     // End the quiz
     const endQuiz = async (quizId) => {
         await updateQuiz(quizId, {
@@ -483,6 +519,7 @@ export const useQuiz = () => {
         // Live quiz control
         startQuiz,
         nextQuestion,
+        startSelfPacedQuiz,
         endQuiz,
         restartQuiz,
 
@@ -506,6 +543,42 @@ export const useQuiz = () => {
 // ============================================================================
 // REAL-TIME SUBSCRIPTION HOOKS
 // ============================================================================
+
+// Hook to subscribe to ALL quizzes (for master admin)
+export const useAllQuizzes = () => {
+    const [quizzes, setQuizzes] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+
+    useEffect(() => {
+        // Query for all quizzes, ordered by creation date
+        const allQuizzesQuery = query(
+            collection(db, 'quizzes'),
+            orderBy('createdAt', 'desc')
+        );
+
+        const unsubscribe = onSnapshot(
+            allQuizzesQuery,
+            (snapshot) => {
+                const allQuizzes = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                setQuizzes(allQuizzes);
+                setLoading(false);
+            },
+            (err) => {
+                console.error('Error fetching all quizzes:', err);
+                setError(err.message);
+                setLoading(false);
+            }
+        );
+
+        return () => unsubscribe();
+    }, []);
+
+    return { quizzes, loading, error };
+};
 
 // Hook to subscribe to admin's quizzes (owned + shared)
 export const useAdminQuizzes = () => {

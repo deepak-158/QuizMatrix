@@ -1,5 +1,5 @@
 // Create Quiz Page - Form to create a new quiz
-// Sets title, time per question, and generates unique code
+// Sets title, time mode (overall or per-question), and generates unique code
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -13,6 +13,8 @@ const CreateQuiz = () => {
 
     const [formData, setFormData] = useState({
         title: '',
+        timeMode: 'perQuestion', // 'perQuestion' or 'overall'
+        timePerQuestion: 30,
         totalTime: 300
     });
     const [errors, setErrors] = useState([]);
@@ -22,9 +24,13 @@ const CreateQuiz = () => {
         const { name, value } = e.target;
         setFormData(prev => ({
             ...prev,
-            [name]: name === 'totalTime' ? parseInt(value) || 300 : value
+            [name]: name === 'totalTime' || name === 'timePerQuestion' ? parseInt(value) || 30 : value
         }));
         setErrors([]);
+    };
+
+    const handleTimeModeChange = (mode) => {
+        setFormData(prev => ({ ...prev, timeMode: mode }));
     };
 
     const handleSubmit = async (e) => {
@@ -95,49 +101,115 @@ const CreateQuiz = () => {
                             <span className="hint">Give your quiz a descriptive name</span>
                         </div>
 
-                        {/* Total Quiz Time */}
+                        {/* Time Mode Selection */}
                         <div className="form-group">
-                            <label htmlFor="totalTime">Total Quiz Duration (seconds) *</label>
-                            <div className="time-input">
-                                <input
-                                    type="range"
-                                    id="totalTime"
-                                    name="totalTime"
-                                    min="60"
-                                    max="3600"
-                                    step="30"
-                                    value={formData.totalTime}
-                                    onChange={handleChange}
-                                />
-                                <span className="time-display">{Math.floor(formData.totalTime / 60)}m {formData.totalTime % 60}s</span>
+                            <label>Quiz Timing Mode *</label>
+                            <div className="mode-buttons">
+                                <button
+                                    type="button"
+                                    className={`mode-btn ${formData.timeMode === 'perQuestion' ? 'active' : ''}`}
+                                    onClick={() => handleTimeModeChange('perQuestion')}
+                                >
+                                    <span className="mode-icon">⏱️</span>
+                                    <span className="mode-title">Per Question</span>
+                                    <span className="mode-desc">Admin controls timing</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    className={`mode-btn ${formData.timeMode === 'overall' ? 'active' : ''}`}
+                                    onClick={() => handleTimeModeChange('overall')}
+                                >
+                                    <span className="mode-icon">⏳</span>
+                                    <span className="mode-title">Overall Time</span>
+                                    <span className="mode-desc">Self-paced quiz</span>
+                                </button>
                             </div>
-                            <span className="hint">Total time for participants to answer all questions</span>
                         </div>
 
-                        {/* Time Presets */}
-                        <div className="time-presets">
-                            {[300, 600, 900, 1200, 1800].map(time => (
-                                <button
-                                    key={time}
-                                    type="button"
-                                    className={`preset-btn ${formData.totalTime === time ? 'active' : ''}`}
-                                    onClick={() => setFormData(prev => ({ ...prev, totalTime: time }))}
-                                >
-                                    {Math.floor(time / 60)}m
-                                </button>
-                            ))}
-                        </div>
+                        {/* Per Question Time Settings */}
+                        {formData.timeMode === 'perQuestion' && (
+                            <div className="form-group">
+                                <label htmlFor="timePerQuestion">Time per Question (seconds) *</label>
+                                <div className="time-input">
+                                    <input
+                                        type="range"
+                                        id="timePerQuestion"
+                                        name="timePerQuestion"
+                                        min="10"
+                                        max="120"
+                                        step="5"
+                                        value={formData.timePerQuestion}
+                                        onChange={handleChange}
+                                    />
+                                    <span className="time-display">{formData.timePerQuestion}s</span>
+                                </div>
+                                <div className="time-presets">
+                                    {[15, 30, 45, 60, 90].map(time => (
+                                        <button
+                                            key={time}
+                                            type="button"
+                                            className={`preset-btn ${formData.timePerQuestion === time ? 'active' : ''}`}
+                                            onClick={() => setFormData(prev => ({ ...prev, timePerQuestion: time }))}
+                                        >
+                                            {time}s
+                                        </button>
+                                    ))}
+                                </div>
+                                <span className="hint">Admin controls when each question starts</span>
+                            </div>
+                        )}
+
+                        {/* Overall Time Settings */}
+                        {formData.timeMode === 'overall' && (
+                            <div className="form-group">
+                                <label htmlFor="totalTime">Total Quiz Duration *</label>
+                                <div className="time-input">
+                                    <input
+                                        type="range"
+                                        id="totalTime"
+                                        name="totalTime"
+                                        min="60"
+                                        max="3600"
+                                        step="30"
+                                        value={formData.totalTime}
+                                        onChange={handleChange}
+                                    />
+                                    <span className="time-display">{Math.floor(formData.totalTime / 60)}m {formData.totalTime % 60}s</span>
+                                </div>
+                                <div className="time-presets">
+                                    {[300, 600, 900, 1200, 1800].map(time => (
+                                        <button
+                                            key={time}
+                                            type="button"
+                                            className={`preset-btn ${formData.totalTime === time ? 'active' : ''}`}
+                                            onClick={() => setFormData(prev => ({ ...prev, totalTime: time }))}
+                                        >
+                                            {Math.floor(time / 60)}m
+                                        </button>
+                                    ))}
+                                </div>
+                                <span className="hint">Participants can navigate questions freely</span>
+                            </div>
+                        )}
 
                         {/* Info Box */}
                         <div className="info-box">
-                            <h4>📌 What happens next?</h4>
-                            <ul>
-                                <li>A unique quiz code will be generated</li>
-                                <li>You'll add questions to your quiz</li>
-                                <li>Share the code with participants</li>
-                                <li>Participants have the total time to answer all questions</li>
-                                <li>Start the quiz when everyone has joined!</li>
-                            </ul>
+                            <h4>📌 {formData.timeMode === 'perQuestion' ? 'Per Question Mode' : 'Overall Time Mode'}</h4>
+                            {formData.timeMode === 'perQuestion' ? (
+                                <ul>
+                                    <li>Admin controls when each question appears</li>
+                                    <li>All participants see the same question</li>
+                                    <li>Timer resets for each question</li>
+                                    <li>Best for live, synchronized quizzes</li>
+                                </ul>
+                            ) : (
+                                <ul>
+                                    <li>Participants answer at their own pace</li>
+                                    <li>Navigate between questions freely</li>
+                                    <li>Quiz auto-submits when time runs out</li>
+                                    <li>Best for exams and assessments</li>
+                                </ul>
+                            )}
                         </div>
 
                         {/* Submit Button */}

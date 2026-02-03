@@ -1,5 +1,6 @@
 // Quiz Control Page - Admin control panel during live quiz
 // Shows current question, controls, and real-time participant count
+// Supports both per-question (admin-controlled) and overall (self-paced) modes
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -16,11 +17,14 @@ const QuizControl = () => {
     const { quiz, loading: quizLoading } = useQuizSubscription(quizId);
     const { questions } = useQuestionsSubscription(quizId);
     const { participants } = useParticipantsSubscription(quizId);
-    const { nextQuestion, endQuiz, restartQuiz } = useQuiz();
+    const { nextQuestion, endQuiz, restartQuiz, startSelfPacedQuiz } = useQuiz();
 
     const [transitioning, setTransitioning] = useState(false);
     const autoAdvanceRef = useRef(false); // Prevent multiple auto-advances
     const lastQuestionIndexRef = useRef(-1);
+
+    // Check if quiz is in self-paced mode
+    const isSelfPaced = quiz?.timeMode === 'overall';
 
     // Reset auto-advance flag when question changes
     useEffect(() => {
@@ -42,12 +46,36 @@ const QuizControl = () => {
         setTransitioning(false);
     };
 
-    // Auto-advance when timer ends
+    // Start self-paced quiz - shows all questions at once
+    const handleStartSelfPaced = async () => {
+        if (transitioning) return;
+        setTransitioning(true);
+        try {
+            await startSelfPacedQuiz(quizId);
+        } catch (error) {
+            console.error('Error starting self-paced quiz:', error);
+            alert('Failed to start quiz');
+        }
+        setTransitioning(false);
+    };
+
+    // Auto-advance when timer ends (only for per-question mode)
     const handleAutoNext = useCallback(() => {
+        if (isSelfPaced) return; // Don't auto-advance in self-paced mode
         if (autoAdvanceRef.current || transitioning) return;
         autoAdvanceRef.current = true;
         handleNextQuestion();
-    }, [quizId, quiz?.currentQuestionIndex, questions?.length, transitioning]);
+    }, [quizId, quiz?.currentQuestionIndex, questions?.length, transitioning, isSelfPaced]);
+
+    // Handle quiz end for self-paced mode (when total time runs out)
+    const handleSelfPacedTimeUp = useCallback(async () => {
+        if (!isSelfPaced) return;
+        try {
+            await endQuiz(quizId);
+        } catch (error) {
+            console.error('Error ending quiz:', error);
+        }
+    }, [quizId, isSelfPaced, endQuiz]);
 
     const handleEndQuiz = async () => {
         if (!window.confirm('Are you sure you want to end the quiz now?')) return;
@@ -131,12 +159,32 @@ const QuizControl = () => {
                                 <p className="participant-info">
                                     {participants.length} participant(s) have joined
                                 </p>
+                                
+                                {/* Mode indicator */}
+                                <div className="mode-indicator">
+                                    {isSelfPaced ? (
+                                        <>
+                                            <span className="mode-badge self-paced">Self-Paced Mode</span>
+                                            <p className="mode-description">
+                                                Participants will have {Math.floor(quiz.totalTime / 60)}m {quiz.totalTime % 60}s to complete all {questions.length} questions at their own pace.
+                                            </p>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <span className="mode-badge per-question">Per-Question Mode</span>
+                                            <p className="mode-description">
+                                                You control when each question starts. {quiz.timePerQuestion}s per question.
+                                            </p>
+                                        </>
+                                    )}
+                                </div>
+
                                 <button
                                     className="btn btn-primary btn-large"
-                                    onClick={handleNextQuestion}
+                                    onClick={isSelfPaced ? handleStartSelfPaced : handleNextQuestion}
                                     disabled={transitioning || participants.length === 0}
                                 >
-                                    {transitioning ? 'Starting...' : '🚀 Start First Question'}
+                                    {transitioning ? 'Starting...' : (isSelfPaced ? '🚀 Start Quiz' : '🚀 Start First Question')}
                                 </button>
                                 {participants.length === 0 && (
                                     <p className="hint">Wait for at least one participant to join</p>
@@ -144,8 +192,8 @@ const QuizControl = () => {
                             </div>
                         )}
 
-                        {/* Live Question State */}
-                        {quiz.status === 'live' && currentQuestion && (
+                        {/* Live Question State - Per-question mode */}
+                        {quiz.status === 'live' && !isSelfPaced && currentQuestion && (
                             <div className="live-question-control">
                                 <div className="question-progress">
                                     Question {quiz.currentQuestionIndex + 1} of {questions.length}
@@ -201,6 +249,45 @@ const QuizControl = () => {
                                         disabled={transitioning}
                                     >
                                         End Quiz Now
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Live State - Self-paced mode */}
+                        {quiz.status === 'live' && isSelfPaced && (
+                            <div className="self-paced-control">
+                                <div className="mode-badge self-paced large">Self-Paced Quiz In Progress</div>
+                                
+                                <Timer
+                                    startTime={quiz.quizStartTime}
+                                    duration={quiz.totalTime}
+                                    isActive={true}
+                                    onTimeUp={handleSelfPacedTimeUp}
+                                />
+
+                                <div className="self-paced-info">
+                                    <p>Participants are answering questions at their own pace.</p>
+                                    <p><strong>{questions.length}</strong> questions available</p>
+                                </div>
+
+                                <div className="questions-overview">
+                                    <h3>All Questions</h3>
+                                    {questions.map((q, idx) => (
+                                        <div key={idx} className="question-mini">
+                                            <span className="q-num">Q{idx + 1}</span>
+                                            <span className="q-text">{q.text.substring(0, 50)}{q.text.length > 50 ? '...' : ''}</span>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="control-actions">
+                                    <button
+                                        className="btn btn-danger btn-large"
+                                        onClick={handleEndQuiz}
+                                        disabled={transitioning}
+                                    >
+                                        🏁 End Quiz Now
                                     </button>
                                 </div>
                             </div>

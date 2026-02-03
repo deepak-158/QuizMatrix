@@ -101,8 +101,16 @@ export const validateQuizData = (quiz) => {
         errors.push('Quiz title must be at least 3 characters');
     }
 
-    if (!quiz.totalTime || quiz.totalTime < 60 || quiz.totalTime > 3600) {
-        errors.push('Total quiz duration must be between 60 and 3600 seconds');
+    // Validate based on time mode
+    if (quiz.timeMode === 'overall') {
+        if (!quiz.totalTime || quiz.totalTime < 60 || quiz.totalTime > 3600) {
+            errors.push('Total quiz duration must be between 60 and 3600 seconds');
+        }
+    } else {
+        // Per-question mode (default)
+        if (!quiz.timePerQuestion || quiz.timePerQuestion < 10 || quiz.timePerQuestion > 120) {
+            errors.push('Time per question must be between 10 and 120 seconds');
+        }
     }
 
     return errors;

@@ -12,16 +12,42 @@ const Timer = memo(({
     const [timeLeft, setTimeLeft] = useState(duration);
     const hasEndedRef = useRef(false);
     const onTimeUpRef = useRef(onTimeUp);
+    const startTimeRef = useRef(startTime);
+    const initializedRef = useRef(false);
 
     // Keep ref updated
     useEffect(() => {
         onTimeUpRef.current = onTimeUp;
     }, [onTimeUp]);
 
-    // Reset when startTime changes (new question)
+    // Only reset when startTime actually changes (new question)
     useEffect(() => {
-        hasEndedRef.current = false;
-        setTimeLeft(duration);
+        // Convert startTime to comparable value
+        let newStartMs = null;
+        if (startTime?.toDate) {
+            newStartMs = startTime.toDate().getTime();
+        } else if (startTime?.seconds) {
+            newStartMs = startTime.seconds * 1000;
+        } else if (startTime) {
+            newStartMs = new Date(startTime).getTime();
+        }
+
+        let oldStartMs = null;
+        if (startTimeRef.current?.toDate) {
+            oldStartMs = startTimeRef.current.toDate().getTime();
+        } else if (startTimeRef.current?.seconds) {
+            oldStartMs = startTimeRef.current.seconds * 1000;
+        } else if (startTimeRef.current) {
+            oldStartMs = new Date(startTimeRef.current).getTime();
+        }
+
+        // Only reset if startTime actually changed (not just re-render)
+        if (newStartMs !== oldStartMs || !initializedRef.current) {
+            hasEndedRef.current = false;
+            startTimeRef.current = startTime;
+            initializedRef.current = true;
+            setTimeLeft(duration);
+        }
     }, [startTime, duration]);
 
     useEffect(() => {
@@ -29,25 +55,26 @@ const Timer = memo(({
 
         // Calculate time left based on server timestamp
         const calculateTimeLeft = () => {
-            if (!startTime) return duration;
+            if (!startTimeRef.current) return duration;
 
             const now = Date.now();
             let start;
-            if (startTime.toDate) {
-                start = startTime.toDate().getTime();
-            } else if (startTime.seconds) {
-                start = startTime.seconds * 1000;
+            if (startTimeRef.current.toDate) {
+                start = startTimeRef.current.toDate().getTime();
+            } else if (startTimeRef.current.seconds) {
+                start = startTimeRef.current.seconds * 1000;
             } else {
-                start = new Date(startTime).getTime();
+                start = new Date(startTimeRef.current).getTime();
             }
             const elapsed = Math.floor((now - start) / 1000);
             return Math.max(0, duration - elapsed);
         };
 
         // Set initial time
-        setTimeLeft(calculateTimeLeft());
+        const initialTime = calculateTimeLeft();
+        setTimeLeft(initialTime);
 
-        // Update every second (not 100ms to reduce re-renders)
+        // Update every second
         const interval = setInterval(() => {
             const remaining = calculateTimeLeft();
             setTimeLeft(remaining);
@@ -60,7 +87,7 @@ const Timer = memo(({
         }, 1000);
 
         return () => clearInterval(interval);
-    }, [startTime, duration, isActive]);
+    }, [duration, isActive]);
 
     // Calculate percentage for progress bar
     const percentage = (timeLeft / duration) * 100;
