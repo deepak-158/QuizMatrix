@@ -1,7 +1,7 @@
 // Timer - Countdown timer component synced with server timestamp
 // Displays remaining time and triggers callback when time is up
 
-import { useState, useEffect, memo, useRef } from 'react';
+import { useState, useEffect, memo, useRef, useMemo } from 'react';
 
 const Timer = memo(({
     startTime,           // Server timestamp when question started
@@ -50,29 +50,37 @@ const Timer = memo(({
         }
     }, [startTime, duration]);
 
+    // Convert startTime to ms for stable dependency
+    const startTimeMs = useMemo(() => {
+        if (!startTime) return null;
+        if (startTime.toDate) return startTime.toDate().getTime();
+        if (startTime.seconds) return startTime.seconds * 1000;
+        return new Date(startTime).getTime();
+    }, [startTime]);
+
     useEffect(() => {
-        if (!isActive || hasEndedRef.current) return;
+        if (!isActive || !startTimeMs) return;
 
         // Calculate time left based on server timestamp
         const calculateTimeLeft = () => {
-            if (!startTimeRef.current) return duration;
-
             const now = Date.now();
-            let start;
-            if (startTimeRef.current.toDate) {
-                start = startTimeRef.current.toDate().getTime();
-            } else if (startTimeRef.current.seconds) {
-                start = startTimeRef.current.seconds * 1000;
-            } else {
-                start = new Date(startTimeRef.current).getTime();
-            }
-            const elapsed = Math.floor((now - start) / 1000);
+            const elapsed = Math.floor((now - startTimeMs) / 1000);
             return Math.max(0, duration - elapsed);
         };
+
+        // Reset hasEnded flag when effect re-runs (new question)
+        hasEndedRef.current = false;
 
         // Set initial time
         const initialTime = calculateTimeLeft();
         setTimeLeft(initialTime);
+
+        // If already expired, trigger immediately
+        if (initialTime <= 0) {
+            hasEndedRef.current = true;
+            if (onTimeUpRef.current) onTimeUpRef.current();
+            return;
+        }
 
         // Update every second
         const interval = setInterval(() => {
@@ -87,7 +95,7 @@ const Timer = memo(({
         }, 1000);
 
         return () => clearInterval(interval);
-    }, [duration, isActive]);
+    }, [duration, isActive, startTimeMs]);
 
     // Calculate percentage for progress bar
     const percentage = (timeLeft / duration) * 100;
